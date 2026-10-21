@@ -2,7 +2,7 @@ name: Publish app to GitHub Pages
 
 on:
   push:
-    branches: [main]
+    branches: [main, claude/app-build]
   workflow_dispatch:
 
 permissions:
@@ -16,6 +16,8 @@ concurrency:
 
 jobs:
   build:
+    # GitHub only lets the repository's default branch publish to Pages
+    if: github.ref_name == github.event.repository.default_branch
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
