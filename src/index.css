@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body { background: #F5F6F2; color: #17252B; }
+body { font-family: "Plus Jakarta Sans", system-ui, sans-serif; -webkit-tap-highlight-color: transparent; }
+:focus-visible { outline: 3px solid rgba(29, 92, 112, 0.45); outline-offset: 2px; }
+
+html[data-text="small"] { font-size: 15px; }
+html[data-text="large"] { font-size: 18px; }
+
+@media print {
+  .no-print { display: none !important; }
+  html, body { background: #fff; }
+  @page { size: A4 landscape; margin: 12mm; }
+}

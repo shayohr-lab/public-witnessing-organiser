@@ -1,0 +1,63 @@
+import type { ReactNode } from "react";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { AuthProvider, useAuth } from "@/lib/auth";
+import { isConfigured } from "@/lib/supabase";
+import { homeFor } from "@/lib/routes";
+import { ToastProvider } from "@/components/Toast";
+import { Spinner } from "@/components/ui";
+import Welcome from "@/pages/Welcome";
+import Register from "@/pages/Register";
+import Login from "@/pages/Login";
+import Pending from "@/pages/Pending";
+import Home from "@/pages/Home";
+import Profile from "@/pages/Profile";
+import Invites from "@/pages/Invites";
+import Alone from "@/pages/Alone";
+import Notices from "@/pages/Notices";
+import MapPage from "@/pages/MapPage";
+import Settings from "@/pages/Settings";
+import Notifications from "@/pages/Notifications";
+import PrintTimetable from "@/pages/PrintTimetable";
+import Admin from "@/pages/admin/Admin";
+import Setup from "@/pages/Setup";
+
+
+function Guard({ children, need }: { children: ReactNode; need: "guest" | "signed-in" | "approved" | "overseer" }) {
+  const { session, profile, loading } = useAuth();
+  if (loading || (session && !profile && need !== "guest")) return <Spinner />;
+  if (need === "guest") return session && profile ? <Navigate to={homeFor(profile.status)} replace /> : <>{children}</>;
+  if (!session) return <Navigate to="/" replace />;
+  if (need === "signed-in") return <>{children}</>;
+  if (profile?.status !== "approved") return <Navigate to="/pending" replace />;
+  if (need === "overseer" && profile.role !== "overseer") return <Navigate to="/home" replace />;
+  return <>{children}</>;
+}
+
+export default function App() {
+  if (!isConfigured) return <Setup />;
+  return (
+    <ToastProvider>
+      <AuthProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Guard need="guest"><Welcome /></Guard>} />
+            <Route path="/register" element={<Guard need="guest"><Register /></Guard>} />
+            <Route path="/login" element={<Guard need="guest"><Login /></Guard>} />
+            <Route path="/pending" element={<Guard need="signed-in"><Pending /></Guard>} />
+            <Route path="/home" element={<Guard need="approved"><Home /></Guard>} />
+            <Route path="/profile" element={<Guard need="approved"><Profile /></Guard>} />
+            <Route path="/invites" element={<Guard need="approved"><Invites /></Guard>} />
+            <Route path="/alone/:bookingId" element={<Guard need="approved"><Alone /></Guard>} />
+            <Route path="/notices" element={<Guard need="approved"><Notices /></Guard>} />
+            <Route path="/map" element={<Guard need="approved"><MapPage /></Guard>} />
+            <Route path="/settings" element={<Guard need="approved"><Settings /></Guard>} />
+            <Route path="/notifications" element={<Guard need="approved"><Notifications /></Guard>} />
+            <Route path="/print" element={<Guard need="approved"><PrintTimetable /></Guard>} />
+            <Route path="/admin" element={<Guard need="overseer"><Admin /></Guard>} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
+    </ToastProvider>
+  );
+}
