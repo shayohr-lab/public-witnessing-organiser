@@ -75,7 +75,7 @@ export default function Overview({ pending, onGoRegistrations }: { pending: numb
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={() => window.open(`/print?week=${week}&location=all`, "_blank")}>Export week (PDF)</Button>
+          <Button variant="secondary" onClick={() => window.open(`${import.meta.env.BASE_URL}print?week=${week}&location=all`, "_blank")}>Export week (PDF)</Button>
           <Button variant="secondary" onClick={() => setCloseOpen(true)}>Close a location / day</Button>
         </div>
       </div>

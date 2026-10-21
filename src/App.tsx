@@ -47,7 +47,7 @@ export default function App() {
   return (
     <ToastProvider>
       <AuthProvider>
-        <BrowserRouter>
+        <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, "")}>
           <Routes>
             <Route path="/" element={<Guard need="guest"><Welcome /></Guard>} />
             <Route path="/register" element={<Guard need="guest"><Register /></Guard>} />

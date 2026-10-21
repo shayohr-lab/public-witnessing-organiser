@@ -31,6 +31,16 @@ All booking rules live in the database (`supabase/migrations/…_pwo_schema_v1.s
    - `VITE_SUPABASE_ANON_KEY`, the anon / publishable key (never the service_role key)
 4. Click **Deploy**. Your app is live at `https://<name>.vercel.app`. Every push to `main` redeploys it.
 
+### Or: GitHub Pages (no extra account)
+
+1. Put the two Supabase values in a file named `.env.production` in this repository:
+   ```
+   VITE_SUPABASE_URL=https://YOUR-PROJECT.supabase.co
+   VITE_SUPABASE_ANON_KEY=YOUR-ANON-OR-PUBLISHABLE-KEY
+   ```
+2. In GitHub, go to **Settings → Pages → Build and deployment → Source** and choose **GitHub Actions**.
+3. Every push to `main` publishes the app at `https://shayohr-lab.github.io/public-witnessing-organiser/` (see the **Actions** tab for progress).
+
 Netlify works the same way: build command `npm run build`, publish directory `dist`, and the same two variables.
 
 ## 3. Make yourself the first Service Overseer
