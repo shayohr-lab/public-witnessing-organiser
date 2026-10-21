@@ -23,8 +23,17 @@ import Setup from "@/pages/Setup";
 
 
 function Guard({ children, need }: { children: ReactNode; need: "guest" | "signed-in" | "approved" | "overseer" }) {
-  const { session, profile, loading } = useAuth();
-  if (loading || (session && !profile && need !== "guest")) return <Spinner />;
+  const { session, profile, loading, checkedFor, signOut } = useAuth();
+  if (loading || (session && checkedFor !== session.user.id && need !== "guest")) return <Spinner />;
+  if (session && !profile && need !== "guest")
+    return (
+      <div className="mx-auto flex min-h-[100dvh] max-w-[480px] flex-col justify-center gap-4 px-6">
+        <h1 className="text-2xl font-extrabold">We couldn't load your account</h1>
+        <p className="text-muted">Please check your internet connection and try again.</p>
+        <button className="h-12 rounded-xl bg-primary font-bold text-white" onClick={() => window.location.reload()}>Try again</button>
+        <button className="h-12 rounded-xl border border-line2 bg-white font-bold" onClick={() => signOut()}>Sign out</button>
+      </div>
+    );
   if (need === "guest") return session && profile ? <Navigate to={homeFor(profile.status)} replace /> : <>{children}</>;
   if (!session) return <Navigate to="/" replace />;
   if (need === "signed-in") return <>{children}</>;
