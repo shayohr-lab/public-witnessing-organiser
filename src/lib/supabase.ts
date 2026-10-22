@@ -15,5 +15,9 @@ export function errorText(e: unknown): string {
   if (!e) return "Something went wrong";
   if (typeof e === "string") return e;
   const m = (e as { message?: string }).message;
+  // Supabase's password-strength message lists every allowed character; say it simply
+  if (m && /^Password should contain at least one character of each/i.test(m))
+    return "The password must have a capital letter, a small letter, a number and a symbol such as ! @ # $ (for example: Mjimwema#2026).";
+  if (m && /^Password should be at least/i.test(m)) return "The password must be at least 8 characters long.";
   return m || "Something went wrong";
 }

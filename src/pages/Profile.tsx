@@ -197,6 +197,7 @@ function PasswordSheet({ open, onClose }: { open: boolean; onClose: () => void }
       <form onSubmit={save} className="flex flex-col gap-3.5">
         <Field label="New password"><Input type="password" autoComplete="new-password" value={pw} onChange={(e) => setPw(e.target.value)} /></Field>
         <Field label="Confirm new password"><Input type="password" autoComplete="new-password" value={pw2} onChange={(e) => setPw2(e.target.value)} /></Field>
+        <p className="-mt-1 text-xs text-muted">At least 8 characters, with a capital letter, a small letter, a number and a symbol (e.g. ! @ #).</p>
         <Button type="submit" busy={busy}>Change password</Button>
       </form>
     </Sheet>

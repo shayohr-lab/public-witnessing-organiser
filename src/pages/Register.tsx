@@ -80,7 +80,7 @@ export default function Register() {
             <Input type="password" autoComplete="new-password" value={f.pw2} onChange={set("pw2")} required />
           </Field>
         </div>
-        <p className="-mt-2 text-xs text-muted">At least 8 characters.</p>
+        <p className="-mt-2 text-xs text-muted">At least 8 characters, with a capital letter, a small letter, a number and a symbol (e.g. ! @ #).</p>
 
         <label className="flex items-start gap-3 text-sm leading-snug text-open-ink">
           <input type="checkbox" checked={f.consent} onChange={set("consent")} className="mt-0.5 h-5 w-5 flex-none accent-[#1D5C70]" />
