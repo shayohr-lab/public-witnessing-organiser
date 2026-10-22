@@ -5,8 +5,9 @@ import { Avatar, Button, Card, Empty, Pill, SectionLabel, Spinner, type PillTone
 import { useToast } from "@/components/Toast";
 import { useAuth } from "@/lib/auth";
 import { supabase, errorText } from "@/lib/supabase";
-import { addDays, fmtDate, fmtDay, fmtRange, timeAgo, todayISO } from "@/lib/format";
+import { addDays, fmtDay, fmtRange, fmtTime, timeAgo, todayISO } from "@/lib/format";
 import { useLive } from "@/lib/useLive";
+import { useCongregation } from "@/lib/congregation";
 
 interface Inv {
   id: string;
@@ -94,6 +95,7 @@ export default function Invites() {
 
 function Incoming({ inv, onDone }: { inv: Inv; onDone: () => void }) {
   const toast = useToast();
+  const { booking_cutoff } = useCongregation();
   const [comment, setComment] = useState("");
   const [busy, setBusy] = useState<"yes" | "no" | null>(null);
   async function respond(accept: boolean) {
@@ -110,7 +112,7 @@ function Incoming({ inv, onDone }: { inv: Inv; onDone: () => void }) {
         <Avatar name={inv.from?.full_name ?? "?"} strong />
         <div className="flex-1">
           <div className="text-[15px] font-extrabold">{inv.from?.full_name} invited you</div>
-          <div className="text-xs text-muted">Sent {timeAgo(inv.created_at)} · reply before {fmtDate(inv.slot_date)}</div>
+          <div className="text-xs text-muted">Sent {timeAgo(inv.created_at)} · Reply before {fmtDay(inv.slot_date)} · {fmtTime(booking_cutoff)}</div>
         </div>
       </div>
       <div className="grid grid-cols-3 gap-1.5 rounded-xl bg-ground px-3 py-2.5">

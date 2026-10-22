@@ -9,6 +9,7 @@ import { supabase, errorText } from "@/lib/supabase";
 import { fmtDay, fmtPhone, fmtRange, initials, phoneDigits } from "@/lib/format";
 import { loadMyBookings, type MyBooking } from "@/lib/myBookings";
 import { useLive } from "@/lib/useLive";
+import { ROLE_LABEL, SERVICE_LABEL } from "@/lib/roles";
 
 export default function Profile() {
   const { profile, refreshProfile, signOut } = useAuth();
@@ -49,7 +50,7 @@ export default function Profile() {
   if (!profile) return null;
 
   return (
-    <AppShell title="Profile">
+    <AppShell title="Your Profile">
       <Card className="flex items-center gap-3.5 p-4">
         <span className="flex h-14 w-14 flex-none items-center justify-center rounded-full bg-primary text-xl font-extrabold text-white" aria-hidden="true">
           {initials(profile.full_name)}
@@ -57,9 +58,10 @@ export default function Profile() {
         <div className="min-w-0 flex-1">
           <div className="text-[17px] font-extrabold">{profile.full_name}</div>
           <div className="text-[13px] text-muted">{fmtPhone(profile.phone)}{profile.email ? ` · ${profile.email}` : ""}</div>
-          <div className="mt-1.5 flex gap-1.5">
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
             <Pill tone="ok">Approved publisher</Pill>
-            {profile.role === "overseer" ? <Pill tone="info">Service Overseer</Pill> : null}
+            {profile.service_type && profile.service_type !== "publisher" ? <Pill tone="info">{SERVICE_LABEL[profile.service_type]}</Pill> : null}
+            {profile.role !== "publisher" ? <Pill tone="info">{ROLE_LABEL[profile.role]}</Pill> : null}
           </div>
         </div>
       </Card>

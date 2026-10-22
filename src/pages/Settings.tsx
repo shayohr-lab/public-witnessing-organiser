@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
 import { SubPage } from "@/components/AppShell";
+import { isStaff } from "@/lib/roles";
 import { Button, Card, SectionLabel } from "@/components/ui";
 import { useToast } from "@/components/Toast";
 import { useAuth } from "@/lib/auth";
@@ -149,8 +150,8 @@ export default function Settings() {
           </>
         ) : null}
 
-        {profile?.role === "overseer" ? (
-          <Link to="/admin" className="mt-3 flex h-12 items-center justify-center rounded-xl bg-ink font-bold text-white">Open Service Overseer console</Link>
+        {isStaff(profile) ? (
+          <Link to="/admin" className="mt-3 flex h-12 items-center justify-center rounded-xl bg-ink font-bold text-white">Open the console</Link>
         ) : null}
         <Button variant="danger" className="mt-3" onClick={async () => { await signOut(); nav("/", { replace: true }); }}>Sign out</Button>
       </div>

@@ -93,7 +93,7 @@ export default function Login() {
 
       <Sheet open={forgot} onClose={() => setForgot(false)} title="Forgot your password?">
         <p className="text-[15px] leading-relaxed text-open-ink">
-          Ask your Service Overseer to reset it. They will give you a temporary password, which you can change later in Profile.
+          Ask your Service Overseer to reset it. They will give you a temporary password, which you can change later in Your Profile.
         </p>
         <Button className="mt-5 w-full" onClick={() => setForgot(false)}>OK</Button>
       </Sheet>

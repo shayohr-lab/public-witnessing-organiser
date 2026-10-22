@@ -53,6 +53,21 @@ export default function Overview({ pending, onGoRegistrations }: { pending: numb
   }, [rows]);
   const days = Array.from({ length: 6 }, (_, i) => addDays(week, i));
 
+  // one group per lone publisher, earliest session first
+  const aloneGroups = useMemo(() => {
+    const m = new Map<string, { id: string; name: string; rows: BoardRow[] }>();
+    [...stats.alone]
+      .sort((a, b) => (a.slot_date + a.start_time).localeCompare(b.slot_date + b.start_time))
+      .forEach((r) => {
+        const p = r.publishers[0];
+        if (!p) return;
+        const g = m.get(p.id) ?? { id: p.id, name: p.full_name, rows: [] };
+        g.rows.push(r);
+        m.set(p.id, g);
+      });
+    return [...m.values()];
+  }, [stats.alone]);
+
   async function reopen(id: string) {
     const { error } = await supabase.from("closures").delete().eq("id", id);
     if (error) return toast(errorText(error), "error");
@@ -137,20 +152,30 @@ export default function Overview({ pending, onGoRegistrations }: { pending: numb
             {stats.alone.length === 0 ? (
               <Empty>No one is alone this week.</Empty>
             ) : (
-              stats.alone.map((a) => {
-                const p = a.publishers[0];
-                const msg = `Hi ${p.full_name.split(" ")[0]}, I saw you're alone at ${a.location_name} on ${fmtDay(a.slot_date)} at ${fmtTime(a.start_time)}. Shall I help you find a companion?`;
+              aloneGroups.map((g) => {
+                const first = g.name.split(" ")[0];
+                const lines = g.rows.map((a) => `${fmtDay(a.slot_date)} · ${fmtTime(a.start_time)} · ${a.location_name}`);
+                const msg =
+                  lines.length === 1
+                    ? `Hi ${first}, I saw you're alone at ${g.rows[0].location_name} on ${fmtDay(g.rows[0].slot_date)} at ${fmtTime(g.rows[0].start_time)}. Shall I help you find a companion?`
+                    : `Hi ${first}, I saw you're alone in these sessions:\n${lines.map((l) => `• ${l}`).join("\n")}\nShall I help you find companions?`;
                 return (
-                  <div key={a.slot_date + a.location_id + a.time_slot_id} className="flex items-center gap-2.5 border-t border-[#ECEEEA] py-2.5 first:border-t-0">
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-extrabold">{fmtDay(a.slot_date)} · {fmtTime(a.start_time)}</div>
-                      <div className="text-xs text-muted">{a.location_name} · {p.full_name} alone</div>
+                  <div key={g.id} className="border-t border-[#ECEEEA] py-3 first:border-t-0">
+                    <div className="flex items-center gap-2.5">
+                      <div className="min-w-0 flex-1 text-[15px] font-extrabold">{g.name}</div>
+                      {phones[g.id] ? (
+                        <a href={whatsappLink(phones[g.id], msg)} target="_blank" rel="noopener noreferrer" aria-label={`WhatsApp ${g.name}`} className="flex h-10 items-center gap-1.5 rounded-xl border border-line2 px-3 text-xs font-bold">
+                          <MessageCircle size={16} aria-hidden="true" /> WhatsApp
+                        </a>
+                      ) : null}
                     </div>
-                    {phones[p.id] ? (
-                      <a href={whatsappLink(phones[p.id], msg)} target="_blank" rel="noopener noreferrer" aria-label={`WhatsApp ${p.full_name}`} className="flex h-10 items-center gap-1.5 rounded-xl border border-line2 px-3 text-xs font-bold">
-                        <MessageCircle size={16} aria-hidden="true" /> WhatsApp
-                      </a>
-                    ) : null}
+                    <ul className="mt-1 flex flex-col gap-0.5">
+                      {g.rows.map((a) => (
+                        <li key={a.slot_date + a.location_id + a.time_slot_id} className="text-[13px] text-muted">
+                          {fmtDay(a.slot_date)} · {fmtTime(a.start_time)} · {a.location_name}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 );
               })

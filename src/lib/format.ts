@@ -111,3 +111,22 @@ export function whatsappLink(phone: string | null | undefined, text: string): st
   const d = phoneDigits(phone || "");
   return `https://wa.me/${d}?text=${encodeURIComponent(text)}`;
 }
+
+/** ["Debbie", "Angela", "Honest"] → "Debbie, Angela & Honest" */
+export function joinNames(names: string[]): string {
+  if (names.length <= 1) return names[0] ?? "";
+  return `${names.slice(0, -1).join(", ")} & ${names[names.length - 1]}`;
+}
+
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+/** "2026-10-22" → "October 2026" */
+export function fmtMonth(iso: string): string {
+  const [y, m] = iso.split("-").map(Number);
+  return `${MONTHS[m - 1]} ${y}`;
+}
+
+/** "2026-10-22" → "2026-10-01" */
+export function firstOfMonth(iso: string): string {
+  return `${iso.slice(0, 7)}-01`;
+}

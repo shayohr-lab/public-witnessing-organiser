@@ -56,6 +56,14 @@ Netlify works the same way: build command `npm run build`, publish directory `di
 
 In Supabase, go to **Edge Functions → Deploy a new function**. Name it `admin-reset-password` and paste `supabase/functions/admin-reset-password/index.ts`. The Service Overseer can then use **Publishers → Reset password** to give a member a temporary password.
 
+## Updating to v1.1 (review of 22/10/26)
+
+1. In Supabase **SQL Editor**, run `supabase/migrations/20261022000000_pwo_update_v1_1.sql` (keeps all data, safe to run again).
+2. Deploy the `admin-reset-password` Edge Function (section 4) if you haven't yet.
+3. Then publish this version of the app.
+
+What v1.1 adds: access levels (Super Admin / MT Assistant / Publisher) and service types (publisher, auxiliary, regular, full-time pioneer); booking for a day closes at 4:30 AM that morning (joining someone who is alone stays open); a companion can be invited once a week (pioneers have no limit); names on every slot, tap a name to see their bookings this month; "Booked at …" on other locations; "Book the next session too?"; invitations shown on the schedule; notice board as titles only; pre-registering publishers with a WhatsApp link; grouped "Needs a companion" messages; delete locations and add/delete time slots.
+
 ## Run locally
 
 ```sh

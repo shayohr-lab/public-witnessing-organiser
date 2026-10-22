@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { Trash2 } from "lucide-react";
 import { Button, Card, Field, Input, Pill, Sheet, Spinner } from "@/components/ui";
 import { useToast } from "@/components/Toast";
 import { useAuth } from "@/lib/auth";
@@ -15,14 +16,16 @@ export default function Locations() {
   const [slots, setSlots] = useState<TimeSlot[]>([]);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [busy, setBusy] = useState(false);
+  const [slotDraft, setSlotDraft] = useState<{ start: string; end: string } | null>(null);
 
   const load = useCallback(async () => {
     const [l, s] = await Promise.all([
       supabase.from("locations").select("*").order("sort_order").order("name"),
       supabase.from("time_slots").select("*").order("start_time"),
     ]);
-    setLocs((l.data as Location[]) ?? []);
-    setSlots((s.data as TimeSlot[]) ?? []);
+    // hidden (archived) rows keep their history but are not shown
+    setLocs(((l.data as Location[]) ?? []).filter((x) => !x.archived));
+    setSlots(((s.data as TimeSlot[]) ?? []).filter((x) => !x.archived));
   }, []);
   useEffect(() => {
     load();
@@ -77,6 +80,35 @@ export default function Locations() {
     load();
   }
 
+  async function removeLocation(l: Location) {
+    if (!window.confirm(`Delete ${l.name}?\n\nIf it was used before it will be hidden instead, so past records stay correct. Its upcoming bookings will be cancelled and the publishers told.`)) return;
+    const { data, error } = await supabase.rpc("delete_location", { p_location: l.id });
+    if (error) return toast(error.code === "PGRST202" ? "Deleting needs the v1.1 database update." : errorText(error), "error");
+    toast(data === "deleted" ? `${l.name} deleted` : `${l.name} hidden — it has booking history`, "info");
+    load();
+  }
+
+  async function addSlot() {
+    if (!slotDraft) return;
+    if (!slotDraft.start || !slotDraft.end) return toast("Choose a start and an end time", "error");
+    setBusy(true);
+    const { error } = await supabase.rpc("add_time_slot", { p_start: slotDraft.start, p_end: slotDraft.end });
+    setBusy(false);
+    if (error) return toast(error.code === "PGRST202" ? "Adding slots needs the v1.1 database update." : errorText(error), "error");
+    toast(`Slot ${fmtRange(slotDraft.start, slotDraft.end)} added`);
+    setSlotDraft(null);
+    load();
+  }
+
+  async function removeSlot(t: TimeSlot) {
+    const label = fmtRange(t.start_time, t.end_time);
+    if (!window.confirm(`Delete the ${label} slot?\n\nIf it was used before it will be hidden instead, so past records stay correct. Its upcoming bookings will be cancelled and the publishers told.`)) return;
+    const { data, error } = await supabase.rpc("delete_time_slot", { p_slot: t.id });
+    if (error) return toast(error.code === "PGRST202" ? "Deleting slots needs the v1.1 database update." : errorText(error), "error");
+    toast(data === "deleted" ? `Slot ${label} deleted` : `Slot ${label} hidden — it has booking history`, "info");
+    load();
+  }
+
   if (!locs) return <Spinner />;
 
   return (
@@ -96,23 +128,45 @@ export default function Locations() {
             </div>
             <Pill tone={l.active ? "ok" : "full"}>{l.active ? "Active" : "Inactive"}</Pill>
             <Button variant="secondary" className="h-10 text-[13px]" onClick={() => openEdit(l)}>Edit</Button>
+            <Button variant="danger" className="h-10 text-[13px]" onClick={() => removeLocation(l)}>Delete</Button>
           </div>
         ))}
       </Card>
-      <p className="-mt-3 text-xs text-muted">To stop using a location, edit it and untick "Active". Its history is kept.</p>
+      <p className="-mt-3 text-xs text-muted">To pause a location, edit it and untick "Active". Delete removes it; a location with booking history is hidden instead.</p>
 
       <Card className="p-5">
-        <h2 className="text-[17px] font-extrabold">Time slots</h2>
-        <p className="mt-1 text-sm text-muted">Monday to Saturday. Switch a slot off to stop new bookings for it.</p>
-        <div className="mt-3 grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))]">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-[17px] font-extrabold">Time slots</h2>
+          <Button variant="secondary" className="h-10 text-[13px]" onClick={() => setSlotDraft({ start: "", end: "" })}>+ Add slot</Button>
+        </div>
+        <p className="mt-1 text-sm text-muted">Monday to Saturday. Tick or untick a slot to turn new bookings for it on or off.</p>
+        <div className="mt-3 grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(250px,1fr))]">
           {slots.map((s) => (
-            <label key={s.id} className="flex h-12 items-center justify-between rounded-xl border border-line px-3.5 text-sm font-bold">
-              {fmtRange(s.start_time, s.end_time)}
-              <input type="checkbox" checked={s.active} onChange={() => toggleSlot(s)} className="h-5 w-5 accent-[#1D5C70]" />
-            </label>
+            <div key={s.id} className="flex h-12 items-center gap-2 rounded-xl border border-line pl-3.5 pr-1.5 text-sm font-bold">
+              <label className="flex flex-1 cursor-pointer items-center justify-between gap-2">
+                <span className={s.active ? "" : "text-muted line-through"}>{fmtRange(s.start_time, s.end_time)}</span>
+                <input type="checkbox" checked={s.active} onChange={() => toggleSlot(s)} aria-label={`Active ${fmtRange(s.start_time, s.end_time)}`} className="h-5 w-5 accent-[#1D5C70]" />
+              </label>
+              <button onClick={() => removeSlot(s)} aria-label={`Delete slot ${fmtRange(s.start_time, s.end_time)}`} className="flex h-9 w-9 items-center justify-center rounded-lg text-danger hover:bg-danger-soft">
+                <Trash2 size={16} />
+              </button>
+            </div>
           ))}
         </div>
       </Card>
+
+      <Sheet open={!!slotDraft} onClose={() => setSlotDraft(null)} title="Add a time slot">
+        {slotDraft ? (
+          <div className="flex flex-col gap-3.5">
+            <div className="grid grid-cols-2 gap-2.5">
+              <Field label="Start"><Input type="time" value={slotDraft.start} onChange={(e) => setSlotDraft({ ...slotDraft, start: e.target.value })} /></Field>
+              <Field label="End"><Input type="time" value={slotDraft.end} onChange={(e) => setSlotDraft({ ...slotDraft, end: e.target.value })} /></Field>
+            </div>
+            <p className="text-xs text-muted">The slot is added to every location, Monday to Saturday. It can't overlap another slot.</p>
+            <Button busy={busy} onClick={addSlot}>Add slot</Button>
+          </div>
+        ) : null}
+      </Sheet>
 
       <Sheet open={!!draft} onClose={() => setDraft(null)} title={draft?.id ? "Edit location" : "Add location"}>
         {draft ? (

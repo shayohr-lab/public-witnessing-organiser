@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import { supabase, errorText } from "@/lib/supabase";
 import { daysBetween, firstName, fmtDay, fmtTime, todayISO, whatsappLink } from "@/lib/format";
+import { useAuth } from "@/lib/auth";
+import { isPioneer } from "@/lib/roles";
 import { Avatar, Button, Empty, Spinner } from "./ui";
 import { useToast } from "./Toast";
 
@@ -20,9 +22,20 @@ export function canInvite(dateISO: string): boolean {
 }
 
 /** Pick up to `max` free publishers and send them an invitation (+ optional WhatsApp share). */
+interface Companion {
+  id: string;
+  full_name: string;
+  /** v1.1 */
+  phone?: string;
+  /** v1.1: I already invited this person for a session this week */
+  invited_this_week?: boolean;
+}
+
 export default function InvitePanel({ slot, max = 2, onDone }: { slot: SlotRef; max?: number; onDone: () => void }) {
   const toast = useToast();
-  const [people, setPeople] = useState<{ id: string; full_name: string }[] | null>(null);
+  const { profile } = useAuth();
+  const pioneer = isPioneer(profile);
+  const [people, setPeople] = useState<Companion[] | null>(null);
   const [q, setQ] = useState("");
   const [picked, setPicked] = useState<string[]>([]);
   const [msg, setMsg] = useState("");
@@ -34,7 +47,7 @@ export default function InvitePanel({ slot, max = 2, onDone }: { slot: SlotRef; 
       .rpc("available_companions", { p_date: slot.slot_date, p_slot: slot.time_slot_id })
       .then(({ data, error }) => {
         if (error) toast(errorText(error), "error");
-        setPeople((data as { id: string; full_name: string }[]) ?? []);
+        setPeople((data as Companion[]) ?? []);
       });
   }, [slot.slot_date, slot.time_slot_id, toast]);
 
@@ -47,7 +60,11 @@ export default function InvitePanel({ slot, max = 2, onDone }: { slot: SlotRef; 
     [people, q],
   );
 
+  const blocked = (p: Companion) => !!p.invited_this_week && !pioneer;
+
   function toggle(id: string) {
+    const p = people?.find((x) => x.id === id);
+    if (p && blocked(p)) return toast(`You already invited ${firstName(p.full_name)} this week. Choose someone else.`, "error");
     setPicked((xs) => (xs.includes(id) ? xs.filter((x) => x !== id) : xs.length >= max ? xs : [...xs, id]));
   }
 
@@ -67,8 +84,12 @@ export default function InvitePanel({ slot, max = 2, onDone }: { slot: SlotRef; 
       else sent++;
     }
     if (sent && wa) {
-      const { data } = await supabase.from("profiles").select("phone").eq("id", picked[0]).maybeSingle();
-      if (data?.phone) window.open(whatsappLink(data.phone, message), "_blank", "noopener");
+      let phone = people?.find((p) => p.id === picked[0])?.phone;
+      if (!phone) {
+        const { data } = await supabase.from("profiles").select("phone").eq("id", picked[0]).maybeSingle();
+        phone = data?.phone;
+      }
+      if (phone) window.open(whatsappLink(phone, message), "_blank", "noopener");
     }
     setBusy(false);
     if (sent) {
@@ -103,11 +124,17 @@ export default function InvitePanel({ slot, max = 2, onDone }: { slot: SlotRef; 
           <div className="max-h-56 overflow-y-auto rounded-2xl border border-line">
             {shown.map((p) => {
               const on = picked.includes(p.id);
+              const no = blocked(p);
               return (
-                <label key={p.id} className={`flex min-h-[52px] cursor-pointer items-center gap-3 border-b border-line px-3.5 py-2 last:border-b-0 ${on ? "bg-primary-soft" : ""}`}>
+                <label key={p.id} className={`flex min-h-[52px] items-center gap-3 border-b border-line px-3.5 py-2 last:border-b-0 ${on ? "bg-primary-soft" : ""} ${no ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}>
                   <Avatar name={p.full_name} strong={on} />
-                  <span className="flex-1 text-sm font-bold">{p.full_name}</span>
-                  <input type="checkbox" checked={on} onChange={() => toggle(p.id)} className="h-[22px] w-[22px] accent-[#1D5C70]" />
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="text-sm font-bold">{p.full_name}</span>
+                    {p.invited_this_week ? (
+                      <span className="text-[11px] font-semibold text-amber-ink">Already invited this week{pioneer ? " · pioneers have no limit" : ""}</span>
+                    ) : null}
+                  </span>
+                  <input type="checkbox" checked={on} disabled={no} onChange={() => toggle(p.id)} className="h-[22px] w-[22px] accent-[#1D5C70]" />
                 </label>
               );
             })}

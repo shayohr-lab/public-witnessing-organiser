@@ -5,7 +5,8 @@ import { useToast } from "@/components/Toast";
 import { useAuth } from "@/lib/auth";
 import { supabase, errorText } from "@/lib/supabase";
 import { fmtPhone, phoneDigits } from "@/lib/format";
-import type { MemberStatus, Profile } from "@/lib/types";
+import type { MemberStatus, Profile, Role, ServiceType } from "@/lib/types";
+import { ROLES, ROLE_LABEL, SERVICE_LABEL, SERVICE_TYPES, isSuperAdmin } from "@/lib/roles";
 
 const STATUS: Record<MemberStatus, [PillTone, string]> = {
   approved: ["ok", "Approved"],
@@ -20,7 +21,9 @@ export default function Publishers() {
   const [items, setItems] = useState<Profile[] | null>(null);
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<"all" | MemberStatus>("approved");
-  const [confirm, setConfirm] = useState<{ p: Profile; action: "deactivate" | "reset" | "role" } | null>(null);
+  const [typeFilter, setTypeFilter] = useState<"all" | ServiceType>("all");
+  const [confirm, setConfirm] = useState<{ p: Profile; action: "deactivate" | "reset" } | null>(null);
+  const superAdmin = isSuperAdmin(me);
   const [temp, setTemp] = useState<{ name: string; pw: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -36,9 +39,9 @@ export default function Publishers() {
     const t = q.trim().toLowerCase();
     const d = phoneDigits(q);
     return (items ?? []).filter(
-      (p) => (filter === "all" || p.status === filter) && (!t || p.full_name.toLowerCase().includes(t) || (d.length > 3 && p.phone.includes(d))),
+      (p) => (filter === "all" || p.status === filter) && (typeFilter === "all" || (p.service_type ?? "publisher") === typeFilter) && (!t || p.full_name.toLowerCase().includes(t) || (d.length > 3 && p.phone.includes(d))),
     );
-  }, [items, q, filter]);
+  }, [items, q, filter, typeFilter]);
 
   async function setStatus(p: Profile, status: MemberStatus) {
     setBusy(true);
@@ -50,14 +53,25 @@ export default function Publishers() {
     load();
   }
 
-  async function setRole(p: Profile) {
-    setBusy(true);
-    const role = p.role === "overseer" ? "publisher" : "overseer";
+  async function setRole(p: Profile, role: Role) {
+    if (role === p.role) return;
+    const warn =
+      role === "overseer"
+        ? `${p.full_name} will get full access: approve and deactivate members, reset passwords, edit locations and slots, post announcements.`
+        : role === "assistant"
+          ? `${p.full_name} will be able to approve registrations, pre-register publishers, help lone publishers and close a location for a day.`
+          : `${p.full_name} will no longer have access to the console.`;
+    if (!window.confirm(`Make ${p.full_name} ${ROLE_LABEL[role]}?\n\n${warn}`)) return;
     const { error } = await supabase.rpc("set_member_role", { p_user: p.id, p_role: role });
-    setBusy(false);
     if (error) return toast(errorText(error), "error");
-    toast(`${p.full_name} is now ${role === "overseer" ? "a Service Overseer" : "a publisher"}`);
-    setConfirm(null);
+    toast(`${p.full_name} is now ${ROLE_LABEL[role]}`);
+    load();
+  }
+
+  async function setType(p: Profile, type: ServiceType) {
+    const { error } = await supabase.rpc("set_service_type", { p_user: p.id, p_type: type });
+    if (error) return toast(errorText(error).includes("set_service_type") ? "This needs the v1.1 database update." : errorText(error), "error");
+    toast(`${p.full_name}: ${SERVICE_LABEL[type]}`);
     load();
   }
 
@@ -72,7 +86,12 @@ export default function Publishers() {
         const ctx = (error as { context?: Response })?.context;
         if (ctx) msg = (await ctx.json()).error || msg;
       } catch { /* ignore */ }
-      return toast(msg.includes("Failed to send") || msg.includes("not found") ? "Password reset is not set up yet (the admin-reset-password function is missing)." : msg, "error");
+      return toast(
+        msg.includes("Failed to send") || msg.toLowerCase().includes("not found")
+          ? "Password reset is not set up yet — deploy the admin-reset-password function in Supabase (Edge Functions)."
+          : msg,
+        "error",
+      );
     }
     setTemp({ name: p.full_name, pw: data.temp_password });
   }
@@ -95,6 +114,10 @@ export default function Publishers() {
           <option value="pending">Pending</option>
           <option value="deactivated">Deactivated</option>
           <option value="declined">Declined</option>
+        </select>
+        <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as typeof typeFilter)} aria-label="Filter by service type" className="h-11 rounded-xl border border-line2 bg-white px-3 text-sm font-semibold">
+          <option value="all">All service types</option>
+          {SERVICE_TYPES.map((t) => <option key={t} value={t}>{SERVICE_LABEL[t]}</option>)}
         </select>
       </div>
 
@@ -119,24 +142,47 @@ export default function Publishers() {
                   </div>
                   <div className="flex flex-wrap items-center gap-1.5">
                     <Pill tone={tone}>{label}</Pill>
-                    {p.role === "overseer" ? <Pill tone="info">Service Overseer</Pill> : null}
+                    {!superAdmin && p.role !== "publisher" ? <Pill tone="info">{ROLE_LABEL[p.role]}</Pill> : null}
+                    {!superAdmin && p.service_type && p.service_type !== "publisher" ? <Pill tone="info">{SERVICE_LABEL[p.service_type]}</Pill> : null}
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {p.status !== "pending" && !self ? (
-                      <Button variant="secondary" className="h-10 text-[13px]" onClick={() => setConfirm({ p, action: "reset" })}>Reset password</Button>
-                    ) : null}
-                    {p.status === "approved" && !self ? (
-                      <Button variant="secondary" className="h-10 text-[13px]" onClick={() => setConfirm({ p, action: "role" })}>
-                        {p.role === "overseer" ? "Make publisher" : "Make Service Overseer"}
-                      </Button>
-                    ) : null}
-                    {p.status === "approved" && !self ? (
-                      <Button variant="danger" className="h-10 text-[13px]" onClick={() => setConfirm({ p, action: "deactivate" })}>Deactivate</Button>
-                    ) : null}
-                    {(p.status === "deactivated" || p.status === "declined") ? (
-                      <Button className="h-10 text-[13px]" busy={busy} onClick={() => setStatus(p, "approved")}>Re-activate</Button>
-                    ) : null}
-                  </div>
+                  {superAdmin && p.status === "approved" ? (
+                    <div className="flex flex-wrap gap-2">
+                      <label className="flex flex-col text-[11px] font-bold text-muted">
+                        Access level
+                        <select
+                          value={p.role}
+                          disabled={self}
+                          onChange={(e) => setRole(p, e.target.value as Role)}
+                          className="mt-0.5 h-10 rounded-xl border border-line2 bg-white px-2.5 text-[13px] font-semibold text-ink disabled:opacity-60"
+                        >
+                          {ROLES.map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
+                        </select>
+                      </label>
+                      <label className="flex flex-col text-[11px] font-bold text-muted">
+                        Service type
+                        <select
+                          value={p.service_type ?? "publisher"}
+                          onChange={(e) => setType(p, e.target.value as ServiceType)}
+                          className="mt-0.5 h-10 rounded-xl border border-line2 bg-white px-2.5 text-[13px] font-semibold text-ink"
+                        >
+                          {SERVICE_TYPES.map((t) => <option key={t} value={t}>{SERVICE_LABEL[t]}</option>)}
+                        </select>
+                      </label>
+                    </div>
+                  ) : null}
+                  {superAdmin ? (
+                    <div className="flex flex-wrap gap-2">
+                      {p.status !== "pending" && !self ? (
+                        <Button variant="secondary" className="h-10 text-[13px]" onClick={() => setConfirm({ p, action: "reset" })}>Reset password</Button>
+                      ) : null}
+                      {p.status === "approved" && !self ? (
+                        <Button variant="danger" className="h-10 text-[13px]" onClick={() => setConfirm({ p, action: "deactivate" })}>Deactivate</Button>
+                      ) : null}
+                      {(p.status === "deactivated" || p.status === "declined") ? (
+                        <Button className="h-10 text-[13px]" busy={busy} onClick={() => setStatus(p, "approved")}>Re-activate</Button>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
               );
             })}
@@ -144,26 +190,22 @@ export default function Publishers() {
         )}
       </div>
 
-      <Sheet open={!!confirm} onClose={() => setConfirm(null)} title={confirm?.action === "reset" ? "Reset password?" : confirm?.action === "role" ? "Change role?" : "Deactivate publisher?"}>
+      <Sheet open={!!confirm} onClose={() => setConfirm(null)} title={confirm?.action === "reset" ? "Reset password?" : "Deactivate publisher?"}>
         {confirm ? (
           <>
             <p className="text-[15px] text-open-ink">
               {confirm.action === "reset"
                 ? `A new temporary password will be created for ${confirm.p.full_name}. Their old password stops working.`
-                : confirm.action === "role"
-                  ? confirm.p.role === "overseer"
-                    ? `${confirm.p.full_name} will no longer have access to this console.`
-                    : `${confirm.p.full_name} will be able to approve members, close locations and post announcements.`
-                  : `${confirm.p.full_name} won't be able to book, and their future bookings will be cancelled. You can re-activate them later.`}
+                : `${confirm.p.full_name} won't be able to book, and their future bookings will be cancelled. You can re-activate them later.`}
             </p>
             <div className="mt-5 grid grid-cols-2 gap-2.5">
               <Button variant="secondary" onClick={() => setConfirm(null)}>Cancel</Button>
               <Button
                 variant={confirm.action === "deactivate" ? "danger" : "primary"}
                 busy={busy}
-                onClick={() => (confirm.action === "reset" ? resetPassword(confirm.p) : confirm.action === "role" ? setRole(confirm.p) : setStatus(confirm.p, "deactivated"))}
+                onClick={() => (confirm.action === "reset" ? resetPassword(confirm.p) : setStatus(confirm.p, "deactivated"))}
               >
-                {confirm.action === "reset" ? "Reset" : confirm.action === "role" ? "Change role" : "Deactivate"}
+                {confirm.action === "reset" ? "Reset" : "Deactivate"}
               </Button>
             </div>
           </>
@@ -173,7 +215,7 @@ export default function Publishers() {
       <Sheet open={!!temp} onClose={() => setTemp(null)} title="Temporary password">
         {temp ? (
           <>
-            <p className="text-sm text-open-ink">Give this to <b>{temp.name}</b> in person. They can change it in Profile → Change password.</p>
+            <p className="text-sm text-open-ink">Give this to <b>{temp.name}</b> in person. They can change it in Your Profile → Change password.</p>
             <div className="mt-4 flex items-center gap-2 rounded-2xl bg-ground p-4">
               <code className="flex-1 select-all text-2xl font-extrabold tracking-wider">{temp.pw}</code>
               <Button variant="secondary" aria-label="Copy password" onClick={() => { navigator.clipboard?.writeText(temp.pw); toast("Copied"); }}>

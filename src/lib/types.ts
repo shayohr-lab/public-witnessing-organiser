@@ -1,4 +1,5 @@
-export type Role = "publisher" | "overseer";
+export type Role = "publisher" | "assistant" | "overseer";
+export type ServiceType = "publisher" | "auxiliary_pioneer" | "regular_pioneer" | "fulltime_pioneer";
 export type MemberStatus = "pending" | "approved" | "declined" | "deactivated";
 
 export interface Profile {
@@ -8,6 +9,7 @@ export interface Profile {
   phone: string;
   email: string | null;
   role: Role;
+  service_type: ServiceType;
   status: MemberStatus;
   consent_at: string | null;
   created_at: string;
@@ -22,6 +24,7 @@ export interface Location {
   latitude: number | null;
   longitude: number | null;
   active: boolean;
+  archived?: boolean;
   sort_order: number;
 }
 
@@ -30,6 +33,7 @@ export interface TimeSlot {
   start_time: string;
   end_time: string;
   active: boolean;
+  archived?: boolean;
 }
 
 export interface BoardRow {
@@ -44,6 +48,33 @@ export interface BoardRow {
   is_mine: boolean;
   my_booking_id: string | null;
   closed: boolean;
+  is_past: boolean;
+  /** v1.1: the day can still be booked (before the morning cut-off) */
+  booking_open?: boolean;
+  /** v1.1: I can book or join this exact slot now */
+  bookable?: boolean;
+  /** v1.1: location where I'm booked at this same date and time */
+  mine_elsewhere?: string | null;
+  /** v1.1: pending invitations to me for this slot */
+  invited_by?: { invitation_id: string; id: string; full_name: string }[];
+}
+
+export interface Preapproval {
+  id: string;
+  full_name: string;
+  phone: string;
+  service_type: ServiceType;
+  created_at: string;
+  used_at: string | null;
+}
+
+export interface MonthBooking {
+  booking_id: string;
+  slot_date: string;
+  start_time: string;
+  end_time: string;
+  location_name: string;
+  booked: number;
   is_past: boolean;
 }
 
