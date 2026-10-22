@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { ChevronDown, Pin } from "lucide-react";
 import AppShell from "@/components/AppShell";
-import { Card, Empty, SectionLabel, Spinner } from "@/components/ui";
+import { Card, Spinner } from "@/components/ui";
 import { supabase } from "@/lib/supabase";
 import { timeAgo } from "@/lib/format";
 import type { Announcement } from "@/lib/types";
@@ -14,6 +15,7 @@ export const GUIDELINES = [
 
 export default function Notices() {
   const [items, setItems] = useState<Announcement[] | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
   useEffect(() => {
     supabase
       .from("announcements")
@@ -25,48 +27,62 @@ export default function Notices() {
     try { localStorage.setItem("pwo.noticesSeen", new Date().toISOString()); } catch { /* ignore */ }
   }, []);
 
+  const toggle = (id: string) => setOpenId((cur) => (cur === id ? null : id));
+
   return (
     <AppShell title="Notice board">
-      <div className="flex flex-col gap-3">
-        {items === null ? (
-          <Spinner />
-        ) : items.length === 0 ? (
-          <Empty>No announcements yet.</Empty>
-        ) : (
-          items.map((a) =>
-            a.pinned ? (
-              <div key={a.id} className="rounded-[18px] bg-ink p-4 text-white">
-                <div className="flex justify-between text-[11px] font-extrabold tracking-[0.06em] text-[#F2B45C]">
-                  <span>PINNED · SERVICE OVERSEER</span>
-                  <span className="font-semibold tracking-normal text-[#B9C4C8]">{timeAgo(a.created_at)}</span>
-                </div>
-                <div className="mt-2 text-base font-extrabold leading-snug">{a.title}</div>
-                {a.body ? <div className="mt-1.5 whitespace-pre-line text-[13px] leading-relaxed text-[#D9E0E2]">{a.body}</div> : null}
-              </div>
-            ) : (
-              <Card key={a.id} className="p-4">
-                <div className="flex justify-between gap-2">
-                  <span className="text-sm font-extrabold">{a.title}</span>
-                  <span className="whitespace-nowrap text-xs text-muted">{timeAgo(a.created_at)}</span>
-                </div>
-                {a.body ? <div className="mt-1 whitespace-pre-line text-[13px] leading-relaxed text-muted">{a.body}</div> : null}
-              </Card>
-            ),
-          )
-        )}
-      </div>
-
-      <div className="mt-6"><SectionLabel>GUIDELINES FOR CART WITNESSING</SectionLabel></div>
-      <Card className="mt-2 px-4">
-        <ol>
-          {GUIDELINES.map(([b, rest], i) => (
-            <li key={i} className="flex gap-3 border-b border-[#ECEEEA] py-3 last:border-b-0">
-              <span className="flex h-[26px] w-[26px] flex-none items-center justify-center rounded-lg bg-primary-soft text-[13px] font-extrabold text-primary-dark">{i + 1}</span>
-              <span className="text-[13px] leading-relaxed"><b>{b}</b> {rest}</span>
-            </li>
+      {items === null ? (
+        <Spinner />
+      ) : (
+        <Card className="overflow-hidden">
+          {items.length === 0 ? <div className="px-4 py-4 text-sm text-muted">No announcements yet.</div> : null}
+          {items.map((a) => (
+            <Item
+              key={a.id}
+              id={a.id}
+              open={openId === a.id}
+              onToggle={toggle}
+              title={a.title}
+              meta={timeAgo(a.created_at)}
+              pinned={a.pinned}
+            >
+              {a.body ? <div className="whitespace-pre-line text-[13px] leading-relaxed text-open-ink">{a.body}</div> : <div className="text-[13px] text-muted">No details.</div>}
+            </Item>
           ))}
-        </ol>
-      </Card>
+          <Item id="guidelines" open={openId === "guidelines"} onToggle={toggle} title="Guidelines for cart witnessing" meta="4 points">
+            <ol>
+              {GUIDELINES.map(([b, rest], i) => (
+                <li key={i} className="flex gap-3 border-b border-[#ECEEEA] py-2.5 last:border-b-0">
+                  <span className="flex h-[26px] w-[26px] flex-none items-center justify-center rounded-lg bg-primary-soft text-[13px] font-extrabold text-primary-dark">{i + 1}</span>
+                  <span className="text-[13px] leading-relaxed"><b>{b}</b> {rest}</span>
+                </li>
+              ))}
+            </ol>
+          </Item>
+        </Card>
+      )}
+      <p className="mt-2 text-xs text-muted">Tap a title to read it.</p>
     </AppShell>
+  );
+}
+
+function Item({
+  id, open, onToggle, title, meta, pinned, children,
+}: { id: string; open: boolean; onToggle: (id: string) => void; title: string; meta: string; pinned?: boolean; children: ReactNode }) {
+  return (
+    <div className="border-b border-[#ECEEEA] last:border-b-0">
+      <button
+        onClick={() => onToggle(id)}
+        aria-expanded={open}
+        aria-controls={`notice-${id}`}
+        className={`flex min-h-[56px] w-full items-center gap-3 px-4 py-3 text-left ${open ? "bg-ground" : ""}`}
+      >
+        {pinned ? <Pin size={16} className="flex-none text-amber-strong" aria-label="Pinned" /> : null}
+        <span className="min-w-0 flex-1 text-sm font-extrabold leading-snug">{title}</span>
+        <span className="whitespace-nowrap text-xs text-muted">{meta}</span>
+        <ChevronDown size={18} className={`flex-none text-muted transition-transform ${open ? "rotate-180" : ""}`} aria-hidden="true" />
+      </button>
+      {open ? <div id={`notice-${id}`} className="px-4 pb-4 pt-1">{children}</div> : null}
+    </div>
   );
 }

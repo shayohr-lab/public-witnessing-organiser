@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { Logo } from "@/components/ui";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/lib/auth";
+import { ROLE_LABEL, isSuperAdmin } from "@/lib/roles";
 import Overview from "./Overview";
 import Registrations from "./Registrations";
 import Publishers from "./Publishers";
@@ -12,6 +14,8 @@ import Announcements from "./Announcements";
 type Tab = "overview" | "registrations" | "publishers" | "locations" | "announcements";
 
 export default function Admin() {
+  const { profile } = useAuth();
+  const superAdmin = isSuperAdmin(profile);
   const [tab, setTab] = useState<Tab>("overview");
   const [pending, setPending] = useState(0);
   const [cong, setCong] = useState("");
@@ -25,12 +29,12 @@ export default function Admin() {
     supabase.from("congregations").select("name").maybeSingle().then(({ data }) => setCong(data?.name ?? ""));
   }, [loadPending]);
 
+  // MT Assistants: bookings and registrations only
   const tabs: [Tab, string][] = [
     ["overview", "Overview"],
     ["registrations", "Registrations"],
     ["publishers", "Publishers"],
-    ["locations", "Locations"],
-    ["announcements", "Announcements"],
+    ...(superAdmin ? ([["locations", "Locations"], ["announcements", "Announcements"]] as [Tab, string][]) : []),
   ];
 
   return (
@@ -40,7 +44,7 @@ export default function Admin() {
           <Logo size={36} />
           <div>
             <div className="text-[15px] font-extrabold">Public Witnessing Organizer</div>
-            <div className="text-xs text-[#B9C4C8]">{cong ? `${cong} · ` : ""}Service Overseer</div>
+            <div className="text-xs text-[#B9C4C8]">{cong ? `${cong} · ` : ""}{profile ? ROLE_LABEL[profile.role] : ""}</div>
           </div>
         </div>
         <Link to="/home" className="flex h-10 items-center gap-1.5 rounded-xl border border-[#3B4A50] px-3.5 text-[13px] font-bold">
@@ -68,8 +72,8 @@ export default function Admin() {
           {tab === "overview" && <Overview pending={pending} onGoRegistrations={() => setTab("registrations")} />}
           {tab === "registrations" && <Registrations onChanged={loadPending} />}
           {tab === "publishers" && <Publishers />}
-          {tab === "locations" && <Locations />}
-          {tab === "announcements" && <Announcements />}
+          {tab === "locations" && superAdmin && <Locations />}
+          {tab === "announcements" && superAdmin && <Announcements />}
         </main>
       </div>
     </div>

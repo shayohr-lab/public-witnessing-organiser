@@ -4,6 +4,7 @@ import { Bell, Home, MapPin, MessageSquareText, Settings, ShieldCheck, User, Use
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { useLive } from "@/lib/useLive";
+import { isStaff } from "@/lib/roles";
 
 function useCounts(userId: string | undefined) {
   const [unread, setUnread] = useState(0);
@@ -45,7 +46,7 @@ export default function AppShell({ title, children, actions }: { title: string; 
   const { profile } = useAuth();
   const { unread, invites } = useCounts(profile?.id);
   const loc = useLocation();
-  const isOverseer = profile?.role === "overseer" && profile.status === "approved";
+  const isOverseer = isStaff(profile);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -65,7 +66,7 @@ export default function AppShell({ title, children, actions }: { title: string; 
         <h1 className="flex-1 text-2xl font-extrabold tracking-tight">{title}</h1>
         {actions}
         {isOverseer ? (
-          <HeaderButton to="/admin" label="Service Overseer console">
+          <HeaderButton to="/admin" label="Console">
             <ShieldCheck size={20} />
           </HeaderButton>
         ) : null}

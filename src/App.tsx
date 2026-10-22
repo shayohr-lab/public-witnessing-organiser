@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { isConfigured } from "@/lib/supabase";
 import { homeFor } from "@/lib/routes";
+import { isStaff } from "@/lib/roles";
 import { ToastProvider } from "@/components/Toast";
 import { Spinner } from "@/components/ui";
 import Welcome from "@/pages/Welcome";
@@ -38,7 +39,7 @@ function Guard({ children, need }: { children: ReactNode; need: "guest" | "signe
   if (!session) return <Navigate to="/" replace />;
   if (need === "signed-in") return <>{children}</>;
   if (profile?.status !== "approved") return <Navigate to="/pending" replace />;
-  if (need === "overseer" && profile.role !== "overseer") return <Navigate to="/home" replace />;
+  if (need === "overseer" && !isStaff(profile)) return <Navigate to="/home" replace />;
   return <>{children}</>;
 }
 
