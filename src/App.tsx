@@ -6,6 +6,7 @@ import { homeFor } from "@/lib/routes";
 import { isStaff } from "@/lib/roles";
 import { ToastProvider } from "@/components/Toast";
 import { Spinner } from "@/components/ui";
+import Landing from "@/pages/Landing";
 import Welcome from "@/pages/Welcome";
 import Register from "@/pages/Register";
 import Login from "@/pages/Login";
@@ -50,7 +51,8 @@ export default function App() {
       <AuthProvider>
         <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, "")}>
           <Routes>
-            <Route path="/" element={<Guard need="guest"><Welcome /></Guard>} />
+            <Route path="/" element={<Guard need="guest"><Landing /></Guard>} />
+            <Route path="/welcome" element={<Guard need="guest"><Welcome /></Guard>} />
             <Route path="/register" element={<Guard need="guest"><Register /></Guard>} />
             <Route path="/login" element={<Guard need="guest"><Login /></Guard>} />
             <Route path="/pending" element={<Guard need="signed-in"><Pending /></Guard>} />
