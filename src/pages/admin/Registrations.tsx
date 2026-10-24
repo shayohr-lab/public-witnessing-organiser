@@ -9,12 +9,23 @@ import { SERVICE_LABEL, SERVICE_TYPES } from "@/lib/roles";
 import { APP_URL } from "@/lib/config";
 import type { Preapproval, Profile, ServiceType } from "@/lib/types";
 
-function inviteText(name: string, phone: string, congregation: string): string {
+function inviteText(name: string, phone: string, congregation: string, code: string | null): string {
+  const link = code ? `${APP_URL}register?code=${code}` : APP_URL;
   return (
     `Hi ${firstName(name)}, you are invited to use the Public Witnessing Organizer` +
-    `${congregation ? ` for ${congregation}` : ""}. Open ${APP_URL}, tap Register and use this number (${fmtPhone(phone)}). ` +
-    `Your account will be approved automatically.`
+    `${congregation ? ` for ${congregation}` : ""}. Open ${link}, tap Register and use this number (${fmtPhone(phone)}). ` +
+    (code
+      ? `Your join code is ${code}. With it your account is approved automatically. Please don't share this code.`
+      : `Your Service Overseer will approve your account.`)
   );
+}
+
+/** Opens a link in a tab that cannot reach back into this page. */
+function openSafely(tab: Window | null, link: string) {
+  if (tab) {
+    tab.opener = null;
+    tab.location.href = link;
+  } else window.location.href = link;
 }
 
 export default function Registrations({ onChanged }: { onChanged: () => void }) {
@@ -31,10 +42,12 @@ export default function Registrations({ onChanged }: { onChanged: () => void }) 
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
-    const [a, b] = await Promise.all([
-      supabase.from("profiles").select("*").eq("status", "pending").order("created_at"),
+    const [a0, b] = await Promise.all([
+      supabase.rpc("staff_profiles", { p_status: "pending" }),
       supabase.from("preapprovals").select("*").is("used_at", null).order("created_at", { ascending: false }),
     ]);
+    // before the v1.2 database update staff_profiles() does not exist yet
+    const a = a0.error ? await supabase.from("profiles").select("*").eq("status", "pending").order("created_at") : a0;
     setItems((a.data as Profile[]) ?? []);
     setPre((b.data as Preapproval[]) ?? []);
     setPreError(!!b.error);
@@ -70,9 +83,10 @@ export default function Registrations({ onChanged }: { onChanged: () => void }) 
       tab?.close();
       return toast(errorText(error), "error");
     }
-    const link = whatsappLink(String(data), inviteText(fullName, String(data), congregation));
-    if (tab) tab.location.href = link;
-    else window.location.href = link;
+    // the database makes a new join code on every pre-registration
+    const { data: row } = await supabase.from("preapprovals").select("join_code").eq("phone", String(data)).maybeSingle();
+    const code = (row as { join_code: string | null } | null)?.join_code ?? null;
+    openSafely(tab, whatsappLink(String(data), inviteText(fullName, String(data), congregation, code)));
     toast(`${fullName.trim()} pre-registered`);
     setFullName("");
     setPhone("");
@@ -123,7 +137,7 @@ export default function Registrations({ onChanged }: { onChanged: () => void }) 
         <Card className="flex min-w-0 flex-[1_1_320px] flex-col gap-3 self-start p-5">
           <h2 className="text-[17px] font-extrabold">Pre-register a publisher</h2>
           <p className="-mt-1 text-sm text-muted">
-            Add their name and number, then send them the app link on WhatsApp. When they register with this number they are approved automatically.
+            Add their name and number, then send them the app link and a join code on WhatsApp. When they register with this number and the code they are approved automatically. The code works for 14 days.
           </p>
           <form onSubmit={preregister} className="flex flex-col gap-3">
             <Field label="Full name"><Input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="e.g. Debbie Mushi" /></Field>
@@ -158,10 +172,15 @@ export default function Registrations({ onChanged }: { onChanged: () => void }) 
                     <div className="min-w-[180px] flex-1">
                       <div className="font-extrabold">{p.full_name}</div>
                       <div className="text-[13px] text-muted">{fmtPhone(p.phone)} · {SERVICE_LABEL[p.service_type]} · added {timeAgo(p.created_at)}</div>
+                      <div className="text-[13px] text-muted">
+                        {p.expires_at && new Date(p.expires_at) < new Date()
+                          ? "Join code expired — pre-register again to send a new one"
+                          : p.join_code ? `Join code ${p.join_code}` : ""}
+                      </div>
                     </div>
                     <div className="flex gap-2">
                       <a
-                        href={whatsappLink(p.phone, inviteText(p.full_name, p.phone, congregation))}
+                        href={whatsappLink(p.phone, inviteText(p.full_name, p.phone, congregation, p.join_code))}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex h-10 items-center gap-1.5 rounded-xl border border-line2 bg-white px-3 text-[13px] font-bold"

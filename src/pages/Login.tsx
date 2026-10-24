@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { supabase } from "@/lib/supabase";
+import { supabase, errorText } from "@/lib/supabase";
 import { phoneDigits } from "@/lib/format";
 import { useAuth } from "@/lib/auth";
 import { homeFor } from "@/lib/routes";
@@ -23,7 +23,11 @@ export default function Login() {
     setBusy(true);
     const identifier = mode === "phone" ? phoneDigits(id) : id.trim();
     const { data: email, error: lookupErr } = await supabase.rpc("login_email_for", { p_identifier: identifier });
-    if (lookupErr || !email) {
+    if (lookupErr) {
+      setBusy(false);
+      return setErr(errorText(lookupErr));
+    }
+    if (!email) {
       setBusy(false);
       return setErr("No account found with that " + (mode === "phone" ? "mobile number." : "email."));
     }
