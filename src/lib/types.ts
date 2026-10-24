@@ -66,6 +66,8 @@ export interface Preapproval {
   service_type: ServiceType;
   created_at: string;
   used_at: string | null;
+  join_code: string | null;
+  expires_at: string | null;
 }
 
 export interface MonthBooking {

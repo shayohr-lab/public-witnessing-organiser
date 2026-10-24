@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase, errorText } from "@/lib/supabase";
 import { AUTH_EMAIL_DOMAIN } from "@/lib/config";
 import { phoneDigits } from "@/lib/format";
@@ -11,7 +11,11 @@ export default function Register() {
   const nav = useNavigate();
   const toast = useToast();
   const { refreshProfile } = useAuth();
-  const [f, setF] = useState({ name: "", phone: "", email: "", pw: "", pw2: "", consent: false });
+  const [params] = useSearchParams();
+  const [f, setF] = useState({
+    name: "", phone: "", email: "", pw: "", pw2: "", consent: false,
+    code: (params.get("code") || "").replace(/\D/g, "").slice(0, 6),
+  });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) =>
@@ -29,7 +33,11 @@ export default function Register() {
     if (!f.consent) return setErr("Please tick the agreement box to continue.");
 
     setBusy(true);
-    const { data: existing } = await supabase.rpc("login_email_for", { p_identifier: digits });
+    const { data: existing, error: lookupErr } = await supabase.rpc("login_email_for", { p_identifier: digits });
+    if (lookupErr) {
+      setBusy(false);
+      return setErr(errorText(lookupErr));
+    }
     if (existing) {
       setBusy(false);
       return setErr("This mobile number is already registered. Please sign in instead.");
@@ -38,7 +46,7 @@ export default function Register() {
     const { data, error } = await supabase.auth.signUp({
       email,
       password: f.pw,
-      options: { data: { full_name: f.name.trim(), phone: digits, email: f.email.trim().toLowerCase(), consent: true } },
+      options: { data: { full_name: f.name.trim(), phone: digits, email: f.email.trim().toLowerCase(), consent: true, join_code: f.code.replace(/\D/g, "") } },
     });
     setBusy(false);
     if (error) return setErr(errorText(error));
@@ -71,6 +79,9 @@ export default function Register() {
         </Field>
         <Field label="Email" hint="(optional)">
           <Input type="email" autoComplete="email" value={f.email} onChange={set("email")} placeholder="name@example.com" />
+        </Field>
+        <Field label="Join code" hint="(if your Service Overseer sent you one)">
+          <Input inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={f.code} onChange={set("code")} placeholder="6 digits" />
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Password">

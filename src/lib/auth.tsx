@@ -27,7 +27,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setCheckedFor(null);
       return null;
     }
-    const { data } = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle();
+    // other members' email is hidden by the database, so the full own row comes from my_profile()
+    const { data } = await supabase.rpc("my_profile").maybeSingle();
     setProfile((data as Profile) ?? null);
     setCheckedFor(userId);
     return (data as Profile) ?? null;
