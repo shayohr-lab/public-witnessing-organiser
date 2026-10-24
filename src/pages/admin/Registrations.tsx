@@ -42,10 +42,12 @@ export default function Registrations({ onChanged }: { onChanged: () => void }) 
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
-    const [a, b] = await Promise.all([
+    const [a0, b] = await Promise.all([
       supabase.rpc("staff_profiles", { p_status: "pending" }),
       supabase.from("preapprovals").select("*").is("used_at", null).order("created_at", { ascending: false }),
     ]);
+    // before the v1.2 database update staff_profiles() does not exist yet
+    const a = a0.error ? await supabase.from("profiles").select("*").eq("status", "pending").order("created_at") : a0;
     setItems((a.data as Profile[]) ?? []);
     setPre((b.data as Preapproval[]) ?? []);
     setPreError(!!b.error);

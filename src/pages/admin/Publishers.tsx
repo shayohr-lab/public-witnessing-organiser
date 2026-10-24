@@ -28,7 +28,9 @@ export default function Publishers() {
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
-    const { data } = await supabase.rpc("staff_profiles");
+    let { data, error } = await supabase.rpc("staff_profiles");
+    // before the v1.2 database update staff_profiles() does not exist yet
+    if (error) ({ data } = await supabase.from("profiles").select("*").order("full_name"));
     setItems((data as Profile[]) ?? []);
   }, []);
   useEffect(() => {
